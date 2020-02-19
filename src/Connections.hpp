@@ -9,8 +9,9 @@
  */
 
 #include <Discord/Connections.hpp>
-#include <Http/Client.hpp>
+#include <Http/IClient.hpp>
 #include <memory>
+#include <SystemAbstractions/DiagnosticsSender.hpp>
 
 /**
  * This is the implementation of Discord::Connections used
@@ -34,15 +35,20 @@ public:
      */
     Connections();
 
-    void Configure(const std::shared_ptr< Http::Client >& client);
+    void Configure(const std::shared_ptr< Http::IClient >& client);
+
+    SystemAbstractions::DiagnosticsSender::UnsubscribeDelegate SubscribeToDiagnostics(
+        SystemAbstractions::DiagnosticsSender::DiagnosticMessageDelegate delegate,
+        size_t minLevel = 0
+    );
 
     // Discord::Connections
 public:
-    virtual std::future< Response > QueueResourceRequest(
+    virtual ResourceRequestTransaction QueueResourceRequest(
         const ResourceRequest& request
     ) override;
 
-    virtual std::future< std::shared_ptr< Discord::WebSocket > > QueueWebSocketRequest(
+    virtual WebSocketRequestTransaction QueueWebSocketRequest(
         const WebSocketRequest& request
     ) override;
 
@@ -58,5 +64,5 @@ private:
     /**
      * This contains the private properties of the instance.
      */
-    std::unique_ptr< Impl > impl_;
+    std::shared_ptr< Impl > impl_;
 };

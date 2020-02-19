@@ -424,6 +424,7 @@ int main(int argc, char* argv[]) {
     // Set up connections interface for Discord.
     auto connections = std::make_shared< Connections >();
     connections->Configure(client);
+    (void)connections->SubscribeToDiagnostics(diagnosticsSender.Chain());
 
     // Connect Discord gateway.
     Discord::Gateway gateway;
@@ -440,6 +441,8 @@ int main(int argc, char* argv[]) {
             SystemAbstractions::DiagnosticsSender::Levels::ERROR,
             "Timeout connecting to Discord gateway"
         );
+        gateway.Disconnect();
+        (void)connected.get();
         return EXIT_FAILURE;
     }
     if (!connected.get()) {
@@ -449,6 +452,15 @@ int main(int argc, char* argv[]) {
         );
         return EXIT_FAILURE;
     }
+
+    // Set up callback for if WebSocket is closed.
+    const auto webSocketClosedPromise = std::make_shared< std::promise< void > >();
+    gateway.RegisterCloseCallback(
+        [webSocketClosedPromise]{
+            webSocketClosedPromise->set_value();
+        }
+    );
+    auto webSocketClosedFuture = webSocketClosedPromise->get_future();
 
     // // Connect to the web server and request an upgrade to a WebSocket.
     // bool wsClosed = false;
@@ -486,8 +498,14 @@ int main(int argc, char* argv[]) {
         3,
         "Press <Ctrl>+<C> (and then <Enter>, if necessary) to exit."
     );
-    while (!shutDown) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    while (
+        !shutDown
+        && (
+            webSocketClosedFuture.wait_for(
+                std::chrono::milliseconds(100)
+            ) != std::future_status::ready
+        )
+    ) {
     }
 
     // // Close our end of the WebSocket, and wait for the other end
