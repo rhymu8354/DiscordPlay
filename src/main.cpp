@@ -459,7 +459,7 @@ int main(int argc, char* argv[]) {
     // Connect Discord gateway.
     diagnosticsSender->SendDiagnosticInformationString(
         3,
-        "Connecting to Discord Gateway"
+        "Connecting to Discord gateway"
     );
     auto connected = gateway.Connect(connections, "DiscordBot");
     if (
@@ -483,7 +483,7 @@ int main(int argc, char* argv[]) {
     }
     diagnosticsSender->SendDiagnosticInformationString(
         3,
-        "PogChamp Connected!"
+        "Gateway connected"
     );
 
     // Set up callback for if WebSocket is closed.
@@ -494,37 +494,6 @@ int main(int argc, char* argv[]) {
         }
     );
     auto webSocketClosedFuture = webSocketClosedPromise->get_future();
-
-    // // Connect to the web server and request an upgrade to a WebSocket.
-    // bool wsClosed = false;
-    // std::mutex mutex;
-    // std::condition_variable condition;
-    // const auto closeDelegate = [
-    //     diagnosticsPublisher,
-    //     &wsClosed,
-    //     &mutex,
-    //     &condition
-    // ](
-    //     unsigned int code,
-    //     const std::string& reason
-    // ){
-    //     std::lock_guard< std::mutex > lock(mutex);
-    //     wsClosed = true;
-    //     condition.notify_one();
-    //     diagnosticsPublisher(
-    //         "WsTalk",
-    //         3,
-    //         StringExtensions::sprintf(
-    //             "WebSocket closed: %u %s",
-    //             code,
-    //             reason.c_str()
-    //         )
-    //     );
-    // };
-
-    // if (ws == nullptr) {
-    //     return EXIT_FAILURE;
-    // }
 
     // Loop until interrupted with SIGINT.
     diagnosticsSender->SendDiagnosticInformationString(
@@ -540,27 +509,6 @@ int main(int argc, char* argv[]) {
         )
     ) {
     }
-
-    // // Close our end of the WebSocket, and wait for the other end
-    // // to close.
-    // ws->Close(1000, "Kthxbye");
-    // {
-    //     std::unique_lock< std::mutex > lock(mutex);
-    //     if (
-    //         !condition.wait_for(
-    //             lock,
-    //             std::chrono::milliseconds(1000),
-    //             [&wsClosed]{ return wsClosed; }
-    //         )
-    //     ) {
-    //         diagnosticsPublisher(
-    //             "WsTalk",
-    //             SystemAbstractions::DiagnosticsSender::Levels::ERROR,
-    //             "Timed out waiting for WebSocket to close on server end"
-    //         );
-    //     }
-    // }
-    // ws = nullptr;
 
     // Shut down Discord gateway and its dependencies.
     gateway.Disconnect();
