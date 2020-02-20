@@ -26,6 +26,7 @@
 #include <SystemAbstractions/File.hpp>
 #include <SystemAbstractions/NetworkConnection.hpp>
 #include <thread>
+#include <Timekeeping/Scheduler.hpp>
 #include <TlsDecorator/TlsDecorator.hpp>
 #include <WebSockets/WebSocket.hpp>
 
@@ -177,6 +178,7 @@ namespace {
      */
     bool StartClient(
         Http::Client& client,
+        const std::shared_ptr< TimeKeeper >& timeKeeper,
         const Environment& environment,
         const std::string& caCerts,
         const SystemAbstractions::DiagnosticsSender& diagnosticsSender
@@ -218,147 +220,10 @@ namespace {
             }
         );
         deps.transport = transport;
-        deps.timeKeeper = std::make_shared< TimeKeeper >();
+        deps.timeKeeper = timeKeeper;
         client.Mobilize(deps);
         return true;
     }
-
-    // /**
-    //  * This function uses the given web client to connect to the web server at
-    //  * the given URL and request an upgrade to the WebSocket protocol.
-    //  *
-    //  * @param[in,out] client
-    //  *     This is the client to use to connect to the server.
-    //  *
-    //  * @param[in] closeDelegate
-    //  *     This is the delegate to provide to the WebSocket to be called
-    //  *     whenever the WebSocket is closed.
-    //  *
-    //  * @param[in] url
-    //  *     This is the URL of the server to which to connect.
-    //  *
-    //  * @param[in] diagnosticsSender
-    //  *     This is the object to use to publish any diagnostic messages.
-    //  *
-    //  * @return
-    //  *     If successful, the WebSocket object representing the client end
-    //  *     of the connected WebSocket is returned.
-    //  *
-    //  * @retval nullptr
-    //  *     This is returned if there is any problem connecting to the server
-    //  *     or upgrading the connection to a WebSocket.
-    //  */
-    // std::shared_ptr< WebSockets::WebSocket > ConnectToWebSocket(
-    //     Http::Client& client,
-    //     WebSockets::WebSocket::CloseReceivedDelegate closeDelegate,
-    //     const Uri::Uri& url,
-    //     const SystemAbstractions::DiagnosticsSender& diagnosticsSender
-    // ) {
-    //     Http::Request request;
-    //     request.method = "GET";
-    //     request.target = url;
-    //     const auto diagnosticMessageDelegate = diagnosticsSender->Chain();
-    //     diagnosticsSender->SendDiagnosticInformationString(
-    //         3,
-    //         "Connecting to '" + request.target.GenerateString() + "'..."
-    //     );
-    //     const auto ws = std::make_shared< WebSockets::WebSocket >();
-    //     ws->SubscribeToDiagnostics(diagnosticMessageDelegate);
-    //     ws->StartOpenAsClient(request);
-    //     WebSockets::WebSocket::Delegates wsDelegates;
-    //     wsDelegates.text = [diagnosticMessageDelegate](const std::string& data){
-    //         diagnosticMessageDelegate(
-    //             "OnText",
-    //             1,
-    //             "Text from WebSocket: " + data
-    //         );
-    //     };
-    //     wsDelegates.ping = [diagnosticMessageDelegate](const std::string& data){
-    //         diagnosticMessageDelegate(
-    //             "OnPing",
-    //             0,
-    //             "Ping from WebSocket: " + data
-    //         );
-    //     };
-    //     wsDelegates.close = closeDelegate;
-    //     ws->SetDelegates(std::move(wsDelegates));
-    //     bool wsEngaged = false;
-    //     const auto transaction = client.Request(
-    //         request,
-    //         false,
-    //         [
-    //             ws,
-    //             &wsEngaged
-    //         ](
-    //             const Http::Response& response,
-    //             std::shared_ptr< Http::Connection > connection,
-    //             const std::string& trailer
-    //         ){
-    //             if (ws->FinishOpenAsClient(connection, response)) {
-    //                 wsEngaged = true;
-    //             }
-    //         }
-    //     );
-    //     while (!shutDown) {
-    //         if (transaction->AwaitCompletion(std::chrono::milliseconds(5000))) {
-    //             switch (transaction->state) {
-    //                 case Http::Client::Transaction::State::Completed: {
-    //                     if (wsEngaged) {
-    //                         diagnosticsSender->SendDiagnosticInformationString(
-    //                             3,
-    //                             "Connection established."
-    //                         );
-    //                         return ws;
-    //                     } else {
-    //                         if (transaction->response.statusCode == 101) {
-    //                             diagnosticsSender->SendDiagnosticInformationString(
-    //                                 SystemAbstractions::DiagnosticsSender::Levels::ERROR,
-    //                                 "Connection upgraded, but failed to engage WebSocket"
-    //                             );
-    //                         } else {
-    //                             diagnosticsSender->SendDiagnosticInformationFormatted(
-    //                                 SystemAbstractions::DiagnosticsSender::Levels::ERROR,
-    //                                 "Got back response: %u %s",
-    //                                 transaction->response.statusCode,
-    //                                 transaction->response.reasonPhrase.c_str()
-    //                             );
-    //                         }
-    //                         return nullptr;
-    //                     }
-    //                 } break;
-
-    //                 case Http::Client::Transaction::State::UnableToConnect: {
-    //                     diagnosticsSender->SendDiagnosticInformationString(
-    //                         SystemAbstractions::DiagnosticsSender::Levels::ERROR,
-    //                         "unable to connect"
-    //                     );
-    //                 } break;
-
-    //                 case Http::Client::Transaction::State::Broken: {
-    //                     diagnosticsSender->SendDiagnosticInformationString(
-    //                         SystemAbstractions::DiagnosticsSender::Levels::ERROR,
-    //                         "connection broken by server"
-    //                     );
-    //                 } break;
-
-    //                 case Http::Client::Transaction::State::Timeout: {
-    //                     diagnosticsSender->SendDiagnosticInformationString(
-    //                         SystemAbstractions::DiagnosticsSender::Levels::ERROR,
-    //                         "timeout waiting for response"
-    //                     );
-    //                 } break;
-
-    //                 default: break;
-    //             }
-    //             return nullptr;
-    //         }
-    //     }
-    //     diagnosticsSender->SendDiagnosticInformationString(
-    //         SystemAbstractions::DiagnosticsSender::Levels::WARNING,
-    //         "Fetch Canceled"
-    //     );
-    //     return nullptr;
-    // }
 
     /**
      * This function stops the client.
@@ -418,12 +283,19 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
+    // Set up a clock and scheduler for use by the HTTP client and Discord
+    // gateway user agent.
+    const auto timeKeeper = std::make_shared< TimeKeeper >();
+    const auto scheduler = std::make_shared< Timekeeping::Scheduler >();
+    scheduler->SetClock(timeKeeper);
+
     // Set up an HTTP client to be used to connect to web APIs.
     const auto client = std::make_shared< Http::Client >();
     const auto diagnosticsSubscription = client->SubscribeToDiagnostics(diagnosticsSender->Chain());
     if (
         !StartClient(
             *client,
+            timeKeeper,
             environment,
             caCerts,
             *diagnosticsSender
@@ -443,6 +315,7 @@ int main(int argc, char* argv[]) {
     // Set up a Discord Gateway interface and subscribe
     // to diagnostic messages from it.
     Discord::Gateway gateway;
+    gateway.SetScheduler(scheduler);
     gateway.RegisterDiagnosticMessageCallback(
         [diagnosticsMessageDelegate](
             size_t level,

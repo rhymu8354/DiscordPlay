@@ -8,16 +8,16 @@
  * © 2020 by Richard Walters
  */
 
-#include <Discord/TimeKeeper.hpp>
+#include <Timekeeping/Clock.hpp>
 #include <Http/TimeKeeper.hpp>
 #include <memory>
 
 /**
- * This is the implementation of Discord::TimeKeeper and Http::TimeKeeper used
+ * This is the implementation of Timekeeping::Clock and Http::TimeKeeper used
  * by the application.
  */
 class TimeKeeper
-    : public Discord::TimeKeeper
+    : public Timekeeping::Clock
     , public Http::TimeKeeper
 {
     // Lifecycle Methods
@@ -35,7 +35,7 @@ public:
      */
     TimeKeeper();
 
-    // Discord::TimeKeeper
+    // Timekeeping::Clock
     // Http::TimeKeeper
 public:
     virtual double GetCurrentTime() override;
