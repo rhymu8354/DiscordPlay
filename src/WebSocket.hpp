@@ -10,6 +10,8 @@
 
 #include <Discord/WebSocket.hpp>
 #include <memory>
+#include <SystemAbstractions/DiagnosticsSender.hpp>
+#include <WebSockets/WebSocket.hpp>
 
 /**
  * This is the implementation of Discord::WebSocket used
@@ -33,6 +35,13 @@ public:
      */
     WebSocket();
 
+    SystemAbstractions::DiagnosticsSender::UnsubscribeDelegate SubscribeToDiagnostics(
+        SystemAbstractions::DiagnosticsSender::DiagnosticMessageDelegate delegate,
+        size_t minLevel = 0
+    );
+
+    void Configure(std::shared_ptr< WebSockets::WebSocket >&& adaptee);
+
     // Discord::WebSocket
 public:
     virtual void Binary(std::string&& message) override;
@@ -54,5 +63,5 @@ private:
     /**
      * This contains the private properties of the instance.
      */
-    std::unique_ptr< Impl > impl_;
+    std::shared_ptr< Impl > impl_;
 };

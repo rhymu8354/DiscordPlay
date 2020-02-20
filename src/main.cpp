@@ -8,6 +8,7 @@
  */
 
 #include "Connections.hpp"
+#include "Diagnostics.hpp"
 #include "TimeKeeper.hpp"
 
 #include <Discord/Gateway.hpp>
@@ -182,7 +183,10 @@ namespace {
     ) {
         auto transport = std::make_shared< HttpNetworkTransport::HttpClientNetworkTransport >();
         auto diagnosticMessageDelegate = diagnosticsSender.Chain();
-        transport->SubscribeToDiagnostics(diagnosticMessageDelegate);
+        transport->SubscribeToDiagnostics(
+            diagnosticMessageDelegate,
+            DIAG_LEVEL_NETWORK_TRANSPORT
+        );
         Http::Client::MobilizationDependencies deps;
         transport->SetConnectionFactory(
             [
@@ -193,14 +197,20 @@ namespace {
                 const std::string& serverName
             ) -> std::shared_ptr< SystemAbstractions::INetworkConnection > {
                 const auto connection = std::make_shared< SystemAbstractions::NetworkConnection >();
-                connection->SubscribeToDiagnostics(diagnosticMessageDelegate);
+                connection->SubscribeToDiagnostics(
+                    diagnosticMessageDelegate,
+                    DIAG_LEVEL_NETWORK_CONNECTION
+                );
                 if (
                     (scheme == "https")
                     || (scheme == "wss")
                 ) {
                     const auto tlsDecorator = std::make_shared< TlsDecorator::TlsDecorator >();
                     tlsDecorator->ConfigureAsClient(connection, caCerts, serverName);
-                    tlsDecorator->SubscribeToDiagnostics(diagnosticMessageDelegate);
+                    tlsDecorator->SubscribeToDiagnostics(
+                        diagnosticMessageDelegate,
+                        DIAG_LEVEL_TLS_DECORATOR
+                    );
                     return tlsDecorator;
                 } else {
                     return connection;
@@ -424,7 +434,10 @@ int main(int argc, char* argv[]) {
     // Set up connections interface for Discord.
     auto connections = std::make_shared< Connections >();
     connections->Configure(client);
-    (void)connections->SubscribeToDiagnostics(diagnosticsSender.Chain());
+    (void)connections->SubscribeToDiagnostics(
+        diagnosticsSender.Chain(),
+        DIAG_LEVEL_CONNECTIONS_INTERFACE
+    );
 
     // Connect Discord gateway.
     Discord::Gateway gateway;
@@ -452,6 +465,10 @@ int main(int argc, char* argv[]) {
         );
         return EXIT_FAILURE;
     }
+    diagnosticsSender.SendDiagnosticInformationString(
+        3,
+        "PogChamp Connected!"
+    );
 
     // Set up callback for if WebSocket is closed.
     const auto webSocketClosedPromise = std::make_shared< std::promise< void > >();

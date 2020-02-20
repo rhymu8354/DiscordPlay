@@ -9,8 +9,13 @@ set(Sources
     src/main.cpp
     src/Connections.cpp
     src/Connections.hpp
+    src/ConnectWebSocket.cpp
+    src/ConnectWebSocket.hpp
+    src/Diagnostics.hpp
     src/TimeKeeper.cpp
     src/TimeKeeper.hpp
+    src/WebSocket.cpp
+    src/WebSocket.hpp
 )
 
 add_executable(${This} ${Sources})
@@ -25,6 +30,7 @@ target_link_libraries(${This} PUBLIC
     StringExtensions
     SystemAbstractions
     TlsDecorator
+    Uri
     WebSockets
 )
 
