@@ -257,8 +257,8 @@ namespace {
     //     Http::Request request;
     //     request.method = "GET";
     //     request.target = url;
-    //     const auto diagnosticMessageDelegate = diagnosticsSender.Chain();
-    //     diagnosticsSender.SendDiagnosticInformationString(
+    //     const auto diagnosticMessageDelegate = diagnosticsSender->Chain();
+    //     diagnosticsSender->SendDiagnosticInformationString(
     //         3,
     //         "Connecting to '" + request.target.GenerateString() + "'..."
     //     );
@@ -304,19 +304,19 @@ namespace {
     //             switch (transaction->state) {
     //                 case Http::Client::Transaction::State::Completed: {
     //                     if (wsEngaged) {
-    //                         diagnosticsSender.SendDiagnosticInformationString(
+    //                         diagnosticsSender->SendDiagnosticInformationString(
     //                             3,
     //                             "Connection established."
     //                         );
     //                         return ws;
     //                     } else {
     //                         if (transaction->response.statusCode == 101) {
-    //                             diagnosticsSender.SendDiagnosticInformationString(
+    //                             diagnosticsSender->SendDiagnosticInformationString(
     //                                 SystemAbstractions::DiagnosticsSender::Levels::ERROR,
     //                                 "Connection upgraded, but failed to engage WebSocket"
     //                             );
     //                         } else {
-    //                             diagnosticsSender.SendDiagnosticInformationFormatted(
+    //                             diagnosticsSender->SendDiagnosticInformationFormatted(
     //                                 SystemAbstractions::DiagnosticsSender::Levels::ERROR,
     //                                 "Got back response: %u %s",
     //                                 transaction->response.statusCode,
@@ -328,21 +328,21 @@ namespace {
     //                 } break;
 
     //                 case Http::Client::Transaction::State::UnableToConnect: {
-    //                     diagnosticsSender.SendDiagnosticInformationString(
+    //                     diagnosticsSender->SendDiagnosticInformationString(
     //                         SystemAbstractions::DiagnosticsSender::Levels::ERROR,
     //                         "unable to connect"
     //                     );
     //                 } break;
 
     //                 case Http::Client::Transaction::State::Broken: {
-    //                     diagnosticsSender.SendDiagnosticInformationString(
+    //                     diagnosticsSender->SendDiagnosticInformationString(
     //                         SystemAbstractions::DiagnosticsSender::Levels::ERROR,
     //                         "connection broken by server"
     //                     );
     //                 } break;
 
     //                 case Http::Client::Transaction::State::Timeout: {
-    //                     diagnosticsSender.SendDiagnosticInformationString(
+    //                     diagnosticsSender->SendDiagnosticInformationString(
     //                         SystemAbstractions::DiagnosticsSender::Levels::ERROR,
     //                         "timeout waiting for response"
     //                     );
@@ -353,7 +353,7 @@ namespace {
     //             return nullptr;
     //         }
     //     }
-    //     diagnosticsSender.SendDiagnosticInformationString(
+    //     diagnosticsSender->SendDiagnosticInformationString(
     //         SystemAbstractions::DiagnosticsSender::Levels::WARNING,
     //         "Fetch Canceled"
     //     );
@@ -400,12 +400,12 @@ int main(int argc, char* argv[]) {
 
     // Set up diagnostics sender representing the application, and
     // register the diagnostic message publisher.
-    SystemAbstractions::DiagnosticsSender diagnosticsSender("DiscordPlay");
-    diagnosticsSender.SubscribeToDiagnostics(diagnosticsPublisher);
+    const auto diagnosticsSender = std::make_shared< SystemAbstractions::DiagnosticsSender >("DiscordPlay");
+    diagnosticsSender->SubscribeToDiagnostics(diagnosticsPublisher);
 
     // Process command line and environment variables.
     Environment environment;
-    if (!ProcessCommandLineArguments(argc, argv, environment, diagnosticsSender)) {
+    if (!ProcessCommandLineArguments(argc, argv, environment, *diagnosticsSender)) {
         PrintUsageInformation();
         return EXIT_FAILURE;
     }
@@ -413,19 +413,19 @@ int main(int argc, char* argv[]) {
     // Load trusted certificate authority (CA) certificate bundle to use
     // at the TLS layer of web connections.
     std::string caCerts;
-    if (!LoadCaCerts(caCerts, diagnosticsSender)) {
+    if (!LoadCaCerts(caCerts, *diagnosticsSender)) {
         return EXIT_FAILURE;
     }
 
     // Set up an HTTP client to be used to connect to web APIs.
     const auto client = std::make_shared< Http::Client >();
-    const auto diagnosticsSubscription = client->SubscribeToDiagnostics(diagnosticsSender.Chain());
+    const auto diagnosticsSubscription = client->SubscribeToDiagnostics(diagnosticsSender->Chain());
     if (
         !StartClient(
             *client,
             environment,
             caCerts,
-            diagnosticsSender
+            *diagnosticsSender
         )
     ) {
         return EXIT_FAILURE;
@@ -435,13 +435,13 @@ int main(int argc, char* argv[]) {
     auto connections = std::make_shared< Connections >();
     connections->Configure(client);
     (void)connections->SubscribeToDiagnostics(
-        diagnosticsSender.Chain(),
+        diagnosticsSender->Chain(),
         DIAG_LEVEL_CONNECTIONS_INTERFACE
     );
 
     // Connect Discord gateway.
     Discord::Gateway gateway;
-    diagnosticsSender.SendDiagnosticInformationString(
+    diagnosticsSender->SendDiagnosticInformationString(
         3,
         "Connecting to Discord Gateway"
     );
@@ -450,7 +450,7 @@ int main(int argc, char* argv[]) {
         connected.wait_for(std::chrono::seconds(5))
         != std::future_status::ready
     ) {
-        diagnosticsSender.SendDiagnosticInformationString(
+        diagnosticsSender->SendDiagnosticInformationString(
             SystemAbstractions::DiagnosticsSender::Levels::ERROR,
             "Timeout connecting to Discord gateway"
         );
@@ -459,13 +459,13 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
     if (!connected.get()) {
-        diagnosticsSender.SendDiagnosticInformationString(
+        diagnosticsSender->SendDiagnosticInformationString(
             SystemAbstractions::DiagnosticsSender::Levels::ERROR,
             "Failed to connect to Discord gateway"
         );
         return EXIT_FAILURE;
     }
-    diagnosticsSender.SendDiagnosticInformationString(
+    diagnosticsSender->SendDiagnosticInformationString(
         3,
         "PogChamp Connected!"
     );
@@ -475,6 +475,15 @@ int main(int argc, char* argv[]) {
     gateway.RegisterCloseCallback(
         [webSocketClosedPromise]{
             webSocketClosedPromise->set_value();
+        }
+    );
+    gateway.RegisterTextCallback(
+        [diagnosticsSender](const std::string& message){
+            diagnosticsSender->SendDiagnosticInformationFormatted(
+                3,
+                "Received text message: %s",
+                message.c_str()
+            );
         }
     );
     auto webSocketClosedFuture = webSocketClosedPromise->get_future();
@@ -511,7 +520,7 @@ int main(int argc, char* argv[]) {
     // }
 
     // Loop until interrupted with SIGINT.
-    diagnosticsSender.SendDiagnosticInformationString(
+    diagnosticsSender->SendDiagnosticInformationString(
         3,
         "Press <Ctrl>+<C> (and then <Enter>, if necessary) to exit."
     );
@@ -554,7 +563,7 @@ int main(int argc, char* argv[]) {
 
     // We're all done!
     (void)signal(SIGINT, previousInterruptHandler);
-    diagnosticsSender.SendDiagnosticInformationString(
+    diagnosticsSender->SendDiagnosticInformationString(
         3,
         "Exiting."
     );

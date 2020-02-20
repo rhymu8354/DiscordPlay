@@ -11,6 +11,7 @@
 
 #include <mutex>
 #include <stddef.h>
+#include <vector>
 
 /**
  * This contains the private properties of a WebSocket class instance.
@@ -20,7 +21,9 @@ struct WebSocket::Impl {
 
     std::shared_ptr< WebSockets::WebSocket > adaptee;
     SystemAbstractions::DiagnosticsSender diagnosticsSender;
-    std::mutex mutex;
+    std::recursive_mutex mutex;
+    ReceiveCallback onText;
+    std::vector< std::string > storedData;
 
     // Methods
 
@@ -61,6 +64,15 @@ struct WebSocket::Impl {
             "Received Text Message: %s",
             data.c_str()
         );
+        decltype(onText) onTextSample(onText);
+        lock.unlock();
+        if (onTextSample == nullptr) {
+            lock.lock();
+            storedData.push_back(std::move(data));
+        } else {
+            onTextSample(std::move(data));
+            lock.lock();
+        }
     }
 };
 
@@ -75,10 +87,12 @@ SystemAbstractions::DiagnosticsSender::UnsubscribeDelegate WebSocket::SubscribeT
     SystemAbstractions::DiagnosticsSender::DiagnosticMessageDelegate delegate,
     size_t minLevel
 ) {
+    std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
     return impl_->diagnosticsSender.SubscribeToDiagnostics(delegate, minLevel);
 }
 
 void WebSocket::Configure(std::shared_ptr< WebSockets::WebSocket >&& adaptee) {
+    std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
     impl_->adaptee = std::move(adaptee);
     impl_->adaptee->SubscribeToDiagnostics(
         impl_->diagnosticsSender.Chain(),
@@ -148,4 +162,18 @@ void WebSocket::RegisterCloseCallback(CloseCallback&& onClose) {
 }
 
 void WebSocket::RegisterTextCallback(ReceiveCallback&& onText) {
+    std::unique_lock< decltype(impl_->mutex) > lock(impl_->mutex);
+    impl_->onText = std::move(onText);
+    if (
+        !impl_->storedData.empty()
+        && (impl_->onText != nullptr)
+    ) {
+        decltype(impl_->storedData) storedData;
+        storedData.swap(impl_->storedData);
+        decltype(impl_->onText) onTextSample(impl_->onText);
+        lock.unlock();
+        for (auto& message: storedData) {
+            onTextSample(std::move(message));
+        }
+    }
 }
