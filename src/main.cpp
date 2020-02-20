@@ -402,6 +402,7 @@ int main(int argc, char* argv[]) {
     // register the diagnostic message publisher.
     const auto diagnosticsSender = std::make_shared< SystemAbstractions::DiagnosticsSender >("DiscordPlay");
     diagnosticsSender->SubscribeToDiagnostics(diagnosticsPublisher);
+    const auto diagnosticsMessageDelegate = diagnosticsSender->Chain();
 
     // Process command line and environment variables.
     Environment environment;
@@ -439,8 +440,23 @@ int main(int argc, char* argv[]) {
         DIAG_LEVEL_CONNECTIONS_INTERFACE
     );
 
-    // Connect Discord gateway.
+    // Set up a Discord Gateway interface and subscribe
+    // to diagnostic messages from it.
     Discord::Gateway gateway;
+    gateway.RegisterDiagnosticMessageCallback(
+        [diagnosticsMessageDelegate](
+            size_t level,
+            std::string&& message
+        ){
+            diagnosticsMessageDelegate(
+                "Gateway",
+                level,
+                message
+            );
+        }
+    );
+
+    // Connect Discord gateway.
     diagnosticsSender->SendDiagnosticInformationString(
         3,
         "Connecting to Discord Gateway"
@@ -475,15 +491,6 @@ int main(int argc, char* argv[]) {
     gateway.RegisterCloseCallback(
         [webSocketClosedPromise]{
             webSocketClosedPromise->set_value();
-        }
-    );
-    gateway.RegisterTextCallback(
-        [diagnosticsSender](const std::string& message){
-            diagnosticsSender->SendDiagnosticInformationFormatted(
-                3,
-                "Received text message: %s",
-                message.c_str()
-            );
         }
     );
     auto webSocketClosedFuture = webSocketClosedPromise->get_future();
