@@ -11,10 +11,10 @@
 
 #include <stddef.h>
 
-constexpr size_t DIAG_LEVEL_CONNECTIONS_INTERFACE = 2;
+constexpr size_t DIAG_LEVEL_CONNECTIONS_INTERFACE = 1;
 constexpr size_t DIAG_LEVEL_HTTP_CLIENT = 0;
 constexpr size_t DIAG_LEVEL_TLS_DECORATOR = 2;
-constexpr size_t DIAG_LEVEL_NETWORK_CONNECTION = 2;
-constexpr size_t DIAG_LEVEL_NETWORK_TRANSPORT = 2;
+constexpr size_t DIAG_LEVEL_NETWORK_CONNECTION = 1;
+constexpr size_t DIAG_LEVEL_NETWORK_TRANSPORT = 0;
 constexpr size_t DIAG_LEVEL_WEB_SOCKET = 0;
 constexpr size_t DIAG_LEVEL_WEB_SOCKET_WRAPPER = 0;

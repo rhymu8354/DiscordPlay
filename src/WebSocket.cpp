@@ -20,8 +20,10 @@ struct WebSocket::Impl {
     // Properties
 
     std::shared_ptr< WebSockets::WebSocket > adaptee;
+    bool closed = false;
     SystemAbstractions::DiagnosticsSender diagnosticsSender;
     std::recursive_mutex mutex;
+    CloseCallback onClose;
     ReceiveCallback onText;
     std::vector< std::string > storedData;
 
@@ -41,6 +43,20 @@ struct WebSocket::Impl {
     void OnClose(
         std::unique_lock< decltype(mutex) >& lock
     ) {
+        if (closed) {
+            return;
+        }
+        diagnosticsSender.SendDiagnosticInformationFormatted(
+            1,
+            "Closed"
+        );
+        closed = true;
+        decltype(onClose) onCloseSample(onClose);
+        lock.unlock();
+        if (onCloseSample != nullptr) {
+            onCloseSample();
+            lock.lock();
+        }
     }
 
     void OnPing(
@@ -60,7 +76,7 @@ struct WebSocket::Impl {
         std::unique_lock< decltype(mutex) >& lock
     ) {
         diagnosticsSender.SendDiagnosticInformationFormatted(
-            3,
+            0,
             "Received Text Message: %s",
             data.c_str()
         );
@@ -150,6 +166,11 @@ void WebSocket::Binary(std::string&& message) {
 }
 
 void WebSocket::Close() {
+    std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+    if (impl_->adaptee == nullptr) {
+        return;
+    }
+    impl_->adaptee->Close(1000);
 }
 
 void WebSocket::Text(std::string&& message) {
@@ -159,6 +180,16 @@ void WebSocket::RegisterBinaryCallback(ReceiveCallback&& onBinary) {
 }
 
 void WebSocket::RegisterCloseCallback(CloseCallback&& onClose) {
+    std::unique_lock< decltype(impl_->mutex) > lock(impl_->mutex);
+    impl_->onClose = std::move(onClose);
+    if (
+        impl_->closed
+        && (impl_->onClose != nullptr)
+    ) {
+        decltype(impl_->onClose) onCloseSample(impl_->onClose);
+        lock.unlock();
+        onCloseSample();
+    }
 }
 
 void WebSocket::RegisterTextCallback(ReceiveCallback&& onText) {

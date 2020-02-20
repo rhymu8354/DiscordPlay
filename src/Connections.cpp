@@ -66,7 +66,7 @@ auto Connections::QueueResourceRequest(
 ) -> ResourceRequestTransaction {
     std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
     impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
-        0,
+        1,
         "%s request for %s",
         request.method.c_str(),
         request.uri.c_str()
@@ -109,7 +109,7 @@ auto Connections::QueueResourceRequest(
             (void)impl->httpClientTransactions.erase(httpClientTransactionsEntry);
             lock.unlock();
             impl->diagnosticsSender.SendDiagnosticInformationFormatted(
-                0,
+                1,
                 "Response: %u %s",
                 httpClientTransaction->response.statusCode,
                 httpClientTransaction->response.reasonPhrase.c_str()
@@ -181,7 +181,7 @@ auto Connections::QueueWebSocketRequest(
     // Log that we are about to make a WebSocket connection attempt.
     std::unique_lock< decltype(impl_->mutex) > lock(impl_->mutex);
     impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
-        0,
+        1,
         "WebSocket request for %s",
         request.uri.c_str()
     );
@@ -242,6 +242,10 @@ auto Connections::QueueWebSocketRequest(
             );
             webSocketPromise.set_value(nullptr);
         } else {
+            impl_->diagnosticsSender.SendDiagnosticInformationString(
+                1,
+                "WebSocket connected"
+            );
             const auto webSocketWrapper = std::make_shared< WebSocket >();
             webSocketWrapper->SubscribeToDiagnostics(
                 impl_->diagnosticsSender.Chain(),
