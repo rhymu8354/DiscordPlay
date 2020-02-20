@@ -174,6 +174,11 @@ void WebSocket::Close() {
 }
 
 void WebSocket::Text(std::string&& message) {
+    std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+    if (impl_->adaptee == nullptr) {
+        return;
+    }
+    impl_->adaptee->SendText(message);
 }
 
 void WebSocket::RegisterBinaryCallback(ReceiveCallback&& onBinary) {
