@@ -165,12 +165,12 @@ void WebSocket::Configure(std::shared_ptr< WebSockets::WebSocket >&& adaptee) {
 void WebSocket::Binary(std::string&& message) {
 }
 
-void WebSocket::Close() {
+void WebSocket::Close(unsigned int code) {
     std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
     if (impl_->adaptee == nullptr) {
         return;
     }
-    impl_->adaptee->Close(1000);
+    impl_->adaptee->Close(code);
 }
 
 void WebSocket::Text(std::string&& message) {

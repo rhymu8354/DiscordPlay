@@ -45,7 +45,7 @@ public:
     // Discord::WebSocket
 public:
     virtual void Binary(std::string&& message) override;
-    virtual void Close() override;
+    virtual void Close(unsigned int code) override;
     virtual void Text(std::string&& message) override;
     virtual void RegisterBinaryCallback(ReceiveCallback&& onBinary) override;
     virtual void RegisterCloseCallback(CloseCallback&& onClose) override;
