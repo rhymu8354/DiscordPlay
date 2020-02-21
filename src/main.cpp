@@ -57,6 +57,7 @@ namespace {
      * or the command-line arguments.
      */
     struct Environment {
+        Discord::Gateway::Configuration configuration;
     };
 
     /**
@@ -271,6 +272,7 @@ int main(int argc, char* argv[]) {
 
     // Process command line and environment variables.
     Environment environment;
+    environment.configuration.userAgent = "DiscordBot";
     if (!ProcessCommandLineArguments(argc, argv, environment, *diagnosticsSender)) {
         PrintUsageInformation();
         return EXIT_FAILURE;
@@ -334,7 +336,10 @@ int main(int argc, char* argv[]) {
         3,
         "Connecting to Discord gateway"
     );
-    auto connected = gateway.Connect(connections, "DiscordBot");
+    auto connected = gateway.Connect(
+        connections,
+        environment.configuration
+    );
     if (
         connected.wait_for(std::chrono::seconds(5))
         != std::future_status::ready
